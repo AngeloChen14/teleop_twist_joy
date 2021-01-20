@@ -26,7 +26,7 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSI
 #include "ros/ros.h"
 #include "sensor_msgs/Joy.h"
 #include "teleop_twist_joy/teleop_twist_joy.h"
-
+#include "std_msgs/Float64.h"
 #include <map>
 #include <string>
 
@@ -46,6 +46,7 @@ struct TeleopTwistJoy::Impl
 
   ros::Subscriber joy_sub;
   ros::Publisher cmd_vel_pub;
+  ros::Publisher angle_cmd_pub;
 
   int enable_button;
   int enable_turbo_button;
@@ -67,8 +68,8 @@ struct TeleopTwistJoy::Impl
 TeleopTwistJoy::TeleopTwistJoy(ros::NodeHandle* nh, ros::NodeHandle* nh_param)
 {
   pimpl_ = new Impl;
-
   pimpl_->cmd_vel_pub = nh->advertise<geometry_msgs::Twist>("cmd_vel", 1, true);
+  pimpl_->angle_cmd_pub = nh->advertise<std_msgs::Float64>("/husky_joint_controller/command", 1, true);
   pimpl_->joy_sub = nh->subscribe<sensor_msgs::Joy>("joy", 1, &TeleopTwistJoy::Impl::joyCallback, pimpl_);
 
   nh_param->param<int>("enable_button", pimpl_->enable_button, 0);
@@ -142,15 +143,18 @@ void TeleopTwistJoy::Impl::sendCmdVelMsg(const sensor_msgs::Joy::ConstPtr& joy_m
 {
   // Initializes with zeros by default.
   geometry_msgs::Twist cmd_vel_msg;
-
+  std_msgs::Float64 angle_msg;
   cmd_vel_msg.linear.x = getVal(joy_msg, axis_linear_map, scale_linear_map[which_map], "x");
   cmd_vel_msg.linear.y = getVal(joy_msg, axis_linear_map, scale_linear_map[which_map], "y");
   cmd_vel_msg.linear.z = getVal(joy_msg, axis_linear_map, scale_linear_map[which_map], "z");
   cmd_vel_msg.angular.z = getVal(joy_msg, axis_angular_map, scale_angular_map[which_map], "yaw");
   cmd_vel_msg.angular.y = getVal(joy_msg, axis_angular_map, scale_angular_map[which_map], "pitch");
   cmd_vel_msg.angular.x = getVal(joy_msg, axis_angular_map, scale_angular_map[which_map], "roll");
-
+  angle_msg.data = joy_msg->axes[3] * 3.141592 / 2;
+  
   cmd_vel_pub.publish(cmd_vel_msg);
+  angle_cmd_pub.publish(angle_msg);
+
   sent_disable_msg = false;
 }
 
